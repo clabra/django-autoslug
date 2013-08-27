@@ -75,6 +75,8 @@ class AutoSlugField(SlugField):
         reappear within a day or within some author's articles but never within
         a day for the same author. Foreign keys are also supported, i.e. not only
         `unique_with='author'` will do, but also `unique_with='author__name'`.
+    :param unique_warning: boolean, default = True: if True, warning when slug is 
+        not unique 
 
     .. _cool URIs don't change: http://w3.org/Provider/Style/URI.html
 
@@ -178,6 +180,9 @@ class AutoSlugField(SlugField):
             kwargs['db_index'] = True
 
         self.always_update = kwargs.pop('always_update', False)
+
+        self.unique_warning = kwargs.pop('unique_warning', True)
+
         super(SlugField, self).__init__(*args, **kwargs)
 
     def pre_save(self, instance, add):
@@ -187,25 +192,25 @@ class AutoSlugField(SlugField):
 
         # autopopulate
         if self.always_update or (self.populate_from and not value):
-            value = utils.get_prepopulated_value(self, instance)
+            values = utils.get_prepopulated_values(self, instance)
 
-            if __debug__ and not value:
+            if __debug__ and not values:
                 print 'Failed to populate slug %s.%s from %s' % \
                     (instance._meta.object_name, self.name, self.populate_from)
 
-        slug = self.slugify(value)
+        slugs = self.slugify(values)
 
-        if not slug:
-            # no incoming value,  use model name
-            slug = instance._meta.module_name
+        if not slugs:
+            # no incoming values,  use model name
+            slugs = [instance._meta.module_name]
 
         assert slug, 'slug is defined before trying to ensure uniqueness'
 
-        slug = utils.crop_slug(self, slug)
+        slugs = [utils.crop_slug(self, slug) for slug in slugs]
 
         # ensure the slug is unique (if required)
         if self.unique or self.unique_with:
-            slug = utils.generate_unique_slug(self, instance, slug)
+            slug = utils.generate_unique_slug(self, instance, slugs)
 
         assert slug, 'value is filled before saving'
 
