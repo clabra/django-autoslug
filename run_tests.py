@@ -2,14 +2,20 @@
 # -*- coding: utf-8 -*-
 
 from django.conf import settings
-from django.core.management import call_command
-
+import os, sys
 
 settings.configure(
     INSTALLED_APPS=('autoslug',),
-    DATABASE_ENGINE='sqlite3',
     AUTOSLUG_SLUGIFY_FUNCTION='django.template.defaultfilters.slugify',
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',     
+        }    
+    }
 )
 
-if __name__ == "__main__":
-    call_command('test', 'autoslug')
+from django.test.simple import DjangoTestSuiteRunner
+test_runner = DjangoTestSuiteRunner(verbosity=1)
+failures = test_runner.run_tests(['autoslug', ])
+if failures: 
+    sys.exit(failures)
