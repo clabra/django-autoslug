@@ -18,7 +18,7 @@ def get_prepopulated_value(field, instance):
     else: 
         fields = field.populate_from
 
-        if isinstance(fields, basestring): 
+        if type(fields) not in [list, tuple]: 
             fields = [fields]
 
         values = []
@@ -59,7 +59,7 @@ def generate_unique_slug(field, instance, slugs):
                 elif field.unique_warning: 
                     sr = u''
                     for r in rivals: 
-                        sr = u"%s'%s %s' and " % (sr, r.id, r)
+                        sr = u"%s'%s %s' and " % (sr, r.pk, r)
                     sr = sr.rstrip(u' and ')
                     warn("Initial base slug '%s' for %s is yet used in %s. Adding index" % (slug.encode('utf-8'), instance.pk or 'instance', sr.encode('utf-8')))
 

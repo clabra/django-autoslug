@@ -38,7 +38,7 @@ class AutoSlugField(SlugField):
 
     AutoSlugField can also perform the following tasks on save:
 
-    - populate itself from another field (using `populate_from`),
+    - populate itself from another field/s (using `populate_from`),
     - use custom `slugify` function (using `slugify` or :doc:`settings`), and
     - preserve uniqueness of the value (using `unique` or `unique_with`).
 
@@ -190,16 +190,15 @@ class AutoSlugField(SlugField):
 
     def pre_save(self, instance, add):
         # get actual value field
-        values = [self.value_from_object(instance)]
+        value = self.value_from_object(instance)
 
         # if autopopulate
-        if self.always_update or (self.populate_from and not values):
+        if self.always_update or (self.populate_from and not value):
             # get prepopulated values
             values = utils.get_prepopulated_value(self, instance)
-
-        # force values to be a list
-        if isinstance(values, basestring):
-            values = [values]
+        else: 
+            # force values to be a list
+            values = [value]
 
         # remove possible empty values
         values = [value for value in values if value]
@@ -216,9 +215,9 @@ class AutoSlugField(SlugField):
                     (instance._meta.object_name, self.name, self.populate_from))
                 return u'' 
             else: 
-                warn (u'Failed to populate slug %s.%s from %s' % \
+                values = [instance._meta.module_name]
+                warn (u'Failed to populate slug %s.%s from %s. Set model name' % \
                     (instance._meta.object_name, self.name, self.populate_from))
-                return 
 
         slugs = [self.slugify(value) for value in values]
 
