@@ -34,6 +34,20 @@ More complex example::
                              unique_with=['author__name', 'pub_date__month'],
                              slugify=lambda value: value.replace(' ','-'))
 
+
+    class Article(Model):
+        title = CharField(max_length=200)
+        pub_date = DateField(auto_now_add=True)
+        author = ForeignKey(User)
+
+        def populate_url(instance):
+                return [instance.title, u"%s by %s" % (instance.title, instance.author)]
+
+        slug = AutoSlugField(populate_from=populate_url,
+                             unique_warning = True, # throw warning if slug is not unique
+                             blank=True, # set u'' instead model name
+                             slugify=lambda value: value.replace(' ','-'))
+
 Documentation
 -------------
 
