@@ -25,7 +25,7 @@ class SimpleModel(Model):
     >>> a = SimpleModel(name='test')
     >>> a.save()
     >>> a.slug
-    'simplemodel'
+    u'simplemodel-4'
     """
     name = CharField(max_length=200)
     slug = AutoSlugField()
@@ -314,3 +314,52 @@ class ModelWithAutoUpdateEnabled(Model):
     """
     name = CharField(max_length=200)
     slug = AutoSlugField(populate_from='name', always_update=True)
+
+
+class ModelWithBlank(Model): 
+    """
+    >>> a = ModelWithBlank(name='')
+    >>> a.save()
+    >>> a.slug
+    u''
+    """
+    name = CharField(max_length=200)
+    slug = AutoSlugField(populate_from='name', blank=True)
+
+
+class ModelWithList(Model): 
+    """
+    >>> model = ModelWithList
+    >>> instances = [model.objects.create(name='name', title='title') for x in range(0,2)]
+    >>> [x.slug for x in model.objects.all()]
+    [u'name', u'title']
+    """
+    name = CharField(max_length=200)
+    title = CharField(max_length=250)
+    slug = AutoSlugField(populate_from=['name', 'title'])
+
+
+class ModelWithTuple(Model): 
+    """
+    >>> model = ModelWithTuple
+    >>> instances = [model.objects.create(name='name', title='title') for x in range(0,2)]
+    >>> [x.slug for x in model.objects.all()]
+    [u'name', u'title']
+    """
+    name = CharField(max_length=200)
+    title = CharField(max_length=250)
+    slug = AutoSlugField(populate_from=('name', 'title'))
+
+
+class ModelWithListIndex(Model): 
+    """
+    >>> model = ModelWithListIndex
+    >>> instances = [model.objects.create(name='name', title='title') for x in range(0,4)]
+    >>> [x.slug for x in model.objects.all()]
+    [u'name', u'title', u'name-2', u'name-3']
+    """
+    name = CharField(max_length=200)
+    title = CharField(max_length=250)
+    slug = AutoSlugField(populate_from=['name', 'title'])
+
+
