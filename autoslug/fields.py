@@ -55,10 +55,12 @@ class AutoSlugField(SlugField):
         change`_ (and the slug is usually a part of object's URI). Note that
         even if the field is editable, any manual changes will be lost when
         this option is activated.
-    :param populate_from: string or callable: if string is given, it is considered
+    :param populate_from: string, list, tuple or callable: if string is given, it is considered
         as the name of attribute from which to fill the slug. If callable is given,
         it should accept `instance` parameter and return a value to fill the slug
-        with.
+        with. If list or tuple are given, the values are considered the name of attributes from 
+        wich to fill slug -without add index- in order of preference. If all list values 
+        are yet used we choose first one adding index
     :param sep: string: if defined, overrides default separator for automatically
         incremented slug index (i.e. the "-" in "foo-2").
     :param slugify: callable: if defined, overrides `AUTOSLUG_SLUGIFY_FUNCTION`
@@ -171,6 +173,7 @@ class AutoSlugField(SlugField):
                  'use unique_with=("foo",) instead.', DeprecationWarning)
             self.unique_with += (kwargs['unique_with_date'],)
 
+        kwargs['unique'] = kwargs.pop('unique', True)
         if self.unique_with:
             # we will do "manual" granular check below
             kwargs['unique'] = False
@@ -186,25 +189,48 @@ class AutoSlugField(SlugField):
         super(SlugField, self).__init__(*args, **kwargs)
 
     def pre_save(self, instance, add):
-
-        # get currently entered slug
+        # get actual value field
         value = self.value_from_object(instance)
 
-        # autopopulate
+        # if autopopulate
         if self.always_update or (self.populate_from and not value):
-            values = utils.get_prepopulated_values(self, instance)
+            # get prepopulated values
+            values = utils.get_prepopulated_value(self, instance)
+        # leave actual field value
+        else: 
+            return value 
 
-            if __debug__ and not values:
-                print 'Failed to populate slug %s.%s from %s' % \
-                    (instance._meta.object_name, self.name, self.populate_from)
+        # force values to be a list
+        if isinstance(values, basestring):
+            values = [values]
 
-        slugs = self.slugify(values)
+        # remove possible empty values
+        values = [value for value in values if value]
 
-        if not slugs:
-            # no incoming values,  use model name
-            slugs = [instance._meta.module_name]
+        # if prepopulation return no values
+        if not values: 
+            if self.default and isinstance(self.default, basestring): 
+                values = [self.default]
+                warn (u'Failed to populate slug %s.%s from %s. Set default' % \
+                    (instance._meta.object_name, self.name, self.populate_from))
+            elif self.blank: 
+                setattr(instance, self.name, u'')
+                warn (u'Failed to populate slug %s.%s from %s. Set blank' % \
+                    (instance._meta.object_name, self.name, self.populate_from))
+                return u'' 
+            else: 
+                warn (u'Failed to populate slug %s.%s from %s' % \
+                    (instance._meta.object_name, self.name, self.populate_from))
+                return 
 
-        assert slug, 'slug is defined before trying to ensure uniqueness'
+        slugs = [self.slugify(value) for value in values]
+
+        if not slugs: 
+            warn (u'Failed to populate slug %s.%s from %s' % \
+                (instance._meta.object_name, self.name, self.populate_from))
+            return 
+
+        assert slugs, 'slugs are defined before trying to ensure uniqueness'
 
         slugs = [utils.crop_slug(self, slug) for slug in slugs]
 
@@ -212,10 +238,16 @@ class AutoSlugField(SlugField):
         if self.unique or self.unique_with:
             slug = utils.generate_unique_slug(self, instance, slugs)
 
-        assert slug, 'value is filled before saving'
+        if not slug: 
+            warn (u'Failed to populate slug %s.%s from %s' % \
+                (instance._meta.object_name, self.name, self.populate_from))
+            return 
 
-        # make the updated slug available as instance attribute
-        setattr(instance, self.name, slug)
+        assert slug, 'value must be filled before saving'
+
+        if slug: 
+            # make the updated slug available as instance attribute
+            setattr(instance, self.name, slug)
 
         return slug
 
