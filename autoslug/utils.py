@@ -42,7 +42,7 @@ def generate_unique_slug(field, instance, slugs):
 
     default_lookups = tuple(get_uniqueness_lookups(field, instance, field.unique_with))
 
-    index = 0
+    index = 1
 
     for add_index in [False, True]: 
         for slug in slugs: 
@@ -57,11 +57,11 @@ def generate_unique_slug(field, instance, slugs):
                     # the slug is unique, no model uses it
                     return slug
                 elif field.unique_warning: 
-                    sr = ''
+                    sr = u''
                     for r in rivals: 
-                        sr = "%s'%s %s' and " % (sr, r.id, r.title.encode('utf-8'))
-                    sr = sr.rstrip(' and ')
-                    warn("Initial base slug '%s' for %s is yet used in %s. Adding index" % (slug.encode('utf-8'), instance.pk or 'instance', sr))
+                        sr = u"%s'%s %s' and " % (sr, r.id, r)
+                    sr = sr.rstrip(u' and ')
+                    warn("Initial base slug '%s' for %s is yet used in %s. Adding index" % (slug.encode('utf-8'), instance.pk or 'instance', sr.encode('utf-8')))
 
                 if add_index: 
                     # the slug is not unique; change once more

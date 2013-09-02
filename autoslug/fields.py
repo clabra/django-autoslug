@@ -190,15 +190,12 @@ class AutoSlugField(SlugField):
 
     def pre_save(self, instance, add):
         # get actual value field
-        value = self.value_from_object(instance)
+        values = [self.value_from_object(instance)]
 
         # if autopopulate
-        if self.always_update or (self.populate_from and not value):
+        if self.always_update or (self.populate_from and not values):
             # get prepopulated values
             values = utils.get_prepopulated_value(self, instance)
-        # leave actual field value
-        else: 
-            return value 
 
         # force values to be a list
         if isinstance(values, basestring):
