@@ -3,7 +3,7 @@
 import os
 import sys
 from django.conf import settings
-import os, sys
+from django.core.management import call_command
 
 conf = dict(
     INSTALLED_APPS = ['autoslug'],
