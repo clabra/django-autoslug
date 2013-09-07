@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-#  Copyright (c) 2008—2009 Andy Mikhailenko
+#  Copyright (c) 2008—2012 Andy Mikhailenko
 #
 #  This file is part of django-autoslug.
 #
@@ -8,9 +8,6 @@
 #  General Public License version 3 (LGPLv3) as published by the Free
 #  Software Foundation. See the file README for copying conditions.
 #
-
-# python
-from warnings import warn
 
 # django
 from django.db.models.fields import SlugField
@@ -23,12 +20,20 @@ except ImportError:
 
 # this app
 from autoslug.settings import slugify
-import utils
+from autoslug import utils
+from warnings import warn
 
 
 __all__ = ['AutoSlugField']
 
 SLUG_INDEX_SEPARATOR = '-'    # the "-" in "foo-2"
+
+try:                 # pragma: nocover
+    # Python 2.x
+    basestring
+except NameError:    # pragma: nocover
+    # Python 3.x
+    basestring = str
 
 
 class AutoSlugField(SlugField):
@@ -143,6 +148,20 @@ class AutoSlugField(SlugField):
         # (ex. usage: user profile models)
         slug = AutoSlugField(populate_from=lambda instance: instance.user.get_full_name())
 
+        # specify model manager for looking up slugs shared by subclasses
+
+        class Article(models.Model):
+            '''An article with title, date and slug. The slug is not totally
+            unique but there will be no two articles with the same slug within
+            any month.
+            '''
+            objects = models.Manager()
+            title = models.CharField(max_length=200)
+            slug = AutoSlugField(populate_from='title', unique_with='pub_date__month', manager=objects)
+
+        class NewsArticle(Article):
+            pass
+
         # autoslugify value using custom `slugify` function
         from autoslug.settings import slugify as default_slugify
         def custom_slugify(value):
@@ -182,6 +201,10 @@ class AutoSlugField(SlugField):
         if 'db_index' not in kwargs:
             kwargs['db_index'] = True
 
+        # When using model inheritence, set manager to search for matching
+        # slug values
+        self.manager = kwargs.pop('manager', None)
+
         self.always_update = kwargs.pop('always_update', False)
 
         self.unique_warning = kwargs.pop('unique_warning', True)
@@ -192,10 +215,17 @@ class AutoSlugField(SlugField):
         # get actual value field
         value = self.value_from_object(instance)
 
+        manager = self.manager
+
         # if autopopulate
         if self.always_update or (self.populate_from and not value):
             # get prepopulated values
             values = utils.get_prepopulated_value(self, instance)
+
+            # pragma: nocover
+            if __debug__ and not values and not self.blank:
+                print('Failed to populate slug %s.%s from %s' % \
+                    (instance._meta.object_name, self.name, self.populate_from))
         else: 
             # force values to be a list
             values = [value]
@@ -210,10 +240,16 @@ class AutoSlugField(SlugField):
                 warn (u'Failed to populate slug %s.%s from %s. Set default' % \
                     (instance._meta.object_name, self.name, self.populate_from))
             elif self.blank: 
-                setattr(instance, self.name, u'')
-                warn (u'Failed to populate slug %s.%s from %s. Set blank' % \
-                    (instance._meta.object_name, self.name, self.populate_from))
-                return u'' 
+                if self.null: 
+                    setattr(instance, self.name, None)
+                    warn (u'Failed to populate slug %s.%s from %s. Set null' % \
+                        (instance._meta.object_name, self.name, self.populate_from))
+                    return None 
+                else: 
+                    setattr(instance, self.name, u'')
+                    warn (u'Failed to populate slug %s.%s from %s. Set blank' % \
+                        (instance._meta.object_name, self.name, self.populate_from))
+                    return u'' 
             else: 
                 values = [instance._meta.module_name]
                 warn (u'Failed to populate slug %s.%s from %s. Set model name' % \
@@ -232,7 +268,7 @@ class AutoSlugField(SlugField):
 
         # ensure the slug is unique (if required)
         if self.unique or self.unique_with:
-            slug = utils.generate_unique_slug(self, instance, slugs)
+            slug = utils.generate_unique_slug(self, instance, slugs, manager)
 
         if not slug: 
             warn (u'Failed to populate slug %s.%s from %s' % \
@@ -250,5 +286,8 @@ class AutoSlugField(SlugField):
     def south_field_triple(self):
         "Returns a suitable description of this field for South."
         args, kwargs = introspector(self)
-        kwargs.update({'populate_from': 'None', 'unique_with': '()'})
+        kwargs.update({
+            'populate_from': 'None' if callable(self.populate_from) else repr(self.populate_from),
+            'unique_with': repr(self.unique_with)
+        })
         return ('autoslug.fields.AutoSlugField', args, kwargs)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-#  Copyright (c) 2008—2009 Andy Mikhailenko
+#  Copyright (c) 2008—2012 Andy Mikhailenko
 #
 #  This file is part of django-autoslug.
 #
@@ -13,7 +13,7 @@
 import datetime
 
 # django
-from django.db.models import Model, CharField, DateField, ForeignKey
+from django.db.models import Model, CharField, DateField, ForeignKey, Manager
 
 # this app
 from autoslug.settings import slugify as default_slugify
@@ -152,7 +152,7 @@ class ModelWithUniqueSlugYear(Model):
 
 class ModelWithLongName(Model):
     """
-    >>> long_name = 'x' * 250
+    >>> long_name = 'x' * 200
     >>> a = ModelWithLongName(name=long_name)
     >>> a.save()
     >>> len(a.slug)    # original slug is cropped by field length
@@ -164,7 +164,7 @@ class ModelWithLongName(Model):
 
 class ModelWithLongNameUnique(Model):
     """
-    >>> long_name = 'x' * 250
+    >>> long_name = 'x' * 200
     >>> a = ModelWithLongNameUnique(name=long_name)
     >>> a.save()
     >>> len(a.slug)    # original slug is cropped by field length
@@ -188,6 +188,30 @@ class ModelWithCallable(Model):
     """
     name = CharField(max_length=200)
     slug = AutoSlugField(populate_from=lambda instance: u'the %s' % instance.name)
+
+
+class ModelWithNullable(Model):
+    """
+    >>> a = ModelWithNullable.objects.create(name=None)
+    >>> a.slug is None
+    True
+    >>> a.slug == ''
+    False
+    """
+    name = CharField(max_length=200, blank=True, null=True)
+    slug = AutoSlugField(populate_from='name', blank=True, null=True)
+
+
+class ModelWithBlank(Model):
+    """
+    >>> a = ModelWithBlank.objects.create(name=None)
+    >>> a.slug is None
+    False
+    >>> a.slug == ''
+    True
+    """
+    name = CharField(max_length=200, blank=True, null=True)
+    slug = AutoSlugField(populate_from='name', blank=True)
 
 
 class ModelWithCallableAttr(Model):
@@ -363,3 +387,37 @@ class ModelWithListIndex(Model):
     slug = AutoSlugField(populate_from=['name', 'title'])
 
 
+# Remove IntegrityError details because they can be different 
+# Shorter class name to avoid error when inserting in auth_permission
+#class ModelWithSlugSpaceSharedIntegrityError(ModelWithUniqueSlug):
+class ModelWithSlugSpaceSharedIntegErr(ModelWithUniqueSlug):
+    """
+    >>> a = ModelWithUniqueSlug(name='My name')
+    >>> a.save()
+    >>> b = ModelWithSlugSpaceSharedIntegErr(name='My name')
+    >>> b.save() # doctest: +ELLIPSIS, +IGNORE_EXCEPTION_DETAIL 
+    Traceback (most recent call last):
+    ...
+    IntegrityError: (1062, "Duplicate entry 'my-name' for key 'slug'")
+    """
+
+
+class SharedSlugSpace(Model):
+    objects = Manager()
+    name = CharField(max_length=200)
+    # ensure that any subclasses use the base model's manager for testing
+    # slug uniqueness
+    slug = AutoSlugField(populate_from='name', unique=True, manager=objects)
+
+
+class ModelWithSlugSpaceShared(SharedSlugSpace):
+    """
+    >>> a = SharedSlugSpace(name='My name')
+    >>> a.save()
+    >>> a.slug
+    u'my-name'
+    >>> b = ModelWithSlugSpaceShared(name='My name')
+    >>> b.save()
+    >>> b.slug
+    u'my-name-2'
+    """

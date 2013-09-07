@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-#  Copyright (c) 2008—2009 Andy Mikhailenko
+#  Copyright (c) 2008—2012 Andy Mikhailenko
 #
 #  This file is part of django-autoslug.
 #
@@ -8,12 +8,11 @@
 #  General Public License version 3 (LGPLv3) as published by the Free
 #  Software Foundation. See the file README for copying conditions.
 #
+"""
+Django settings that affect django-autoslug:
 
-from django.conf import settings
-
-__doc__ = """Available settings for django-autoslug:
-
-* `AUTOSLUG_SLUGIFY_FUNCTION` allows to define a custom slugifying function.
+`AUTOSLUG_SLUGIFY_FUNCTION`
+  Allows to define a custom slugifying function.
 
   The function can be repsesented as string or callable, e.g.::
 
@@ -26,27 +25,35 @@ __doc__ = """Available settings for django-autoslug:
       # custom function, defined inline:
       AUTOSLUG_SLUGIFY_FUNCTION = lambda slug: 'can i haz %s?' % slug
 
-  Default value is 'django.template.defaultfilters.slugify' or,
-  pytils.translit's slugify function if installed.
+  If no value is given, default value is used.
+
+  Default value is one of these depending on availability in given order:
+
+  * `unidecode.unidecode()` if Unidecode_ is available;
+  * `pytils.translit.slugify()` if pytils_ is available;
+  * `django.template.defaultfilters.slugify()` bundled with Django.
+
+  django-autoslug also ships a couple of slugify functions that use
+  the translitcodec_ Python library, e.g.::
+
+     # using as many characters as needed to make a natural replacement
+     AUTOSLUG_SLUGIFY_FUNCTION = 'autoslug.utils.translit_long'
+
+     # using the minimum number of characters to make a replacement
+     AUTOSLUG_SLUGIFY_FUNCTION = 'autoslug.utils.translit_short'
+
+     # only performing single character replacements
+     AUTOSLUG_SLUGIFY_FUNCTION = 'autoslug.utils.translit_one'
+
+.. _Unidecode: http://pypi.python.org/pypi/Unidecode
+.. _pytils: http://pypi.python.org/pypi/pytils
+.. _translitcodec: http://pypi.python.org/pypi/translitcodec
+
 """
+from django.conf import settings
+from django.core.urlresolvers import get_callable
 
 # use custom slugifying function if any
-slugify = getattr(settings, 'AUTOSLUG_SLUGIFY_FUNCTION', None)
-
-if not slugify:
-    try:
-        # i18n-friendly approach
-        from unidecode import unidecode
-        slugify = lambda s: unidecode(s).replace(' ', '-')
-    except ImportError:
-        try:
-            # Cyrillic transliteration (primarily Russian)
-            from pytils.translit import slugify
-        except ImportError:
-            # fall back to Django's default method
-            slugify = 'django.template.defaultfilters.slugify'
-
-# find callable by string
-if isinstance(slugify, str):
-    from django.core.urlresolvers import get_callable
-    slugify = get_callable(slugify)
+#slugify_function_path = getattr(settings, 'AUTOSLUG_SLUGIFY_FUNCTION', 'autoslug.utils.slugify')
+slugify_function_path = 'autoslug.utils.slugify'
+slugify = get_callable(slugify_function_path)

@@ -1,21 +1,31 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import os
+import sys
 from django.conf import settings
 import os, sys
 
-settings.configure(
-    INSTALLED_APPS=('autoslug',),
-    AUTOSLUG_SLUGIFY_FUNCTION='django.template.defaultfilters.slugify',
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',     
-        }    
-    }
+conf = dict(
+    INSTALLED_APPS = ['autoslug'],
+    DATABASES = dict(
+        default = dict(
+            ENGINE='django.db.backends.sqlite3',
+        ),
+    ),
+    AUTOSLUG_SLUGIFY_FUNCTION = 'django.template.defaultfilters.slugify',
 )
 
-from django.test.simple import DjangoTestSuiteRunner
-test_runner = DjangoTestSuiteRunner(verbosity=1)
-failures = test_runner.run_tests(['autoslug', ])
-if failures: 
-    sys.exit(failures)
+# django-coverage does not support Python 3 yet
+if sys.version < '3.0':
+    conf['INSTALLED_APPS'].append('django_coverage')
+    conf.update(COVERAGE_REPORT_HTML_OUTPUT_DIR = os.path.join('.', 'coverage'))
+    test_command = 'test_coverage'
+else:
+    test_command = 'test'
+
+
+settings.configure(**conf)
+
+
+if __name__ == "__main__":
+    call_command(test_command, 'autoslug')

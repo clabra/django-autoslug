@@ -1,8 +1,34 @@
 # -*- coding: utf-8 -*-
-#from __future__ import unicode_literals
+#
+#  Copyright (c) 2008—2012 Andy Mikhailenko
+#
+#  This file is part of django-autoslug.
+#
+#  django-autoslug is free software under terms of the GNU Lesser
+#  General Public License version 3 (LGPLv3) as published by the Free
+#  Software Foundation. See the file README for copying conditions.
+#
+
+# django
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models.fields import FieldDoesNotExist, DateField
-from django.db.utils import IntegrityError
+from django.template.defaultfilters import slugify as django_slugify
 from warnings import warn
+
+try:
+    # i18n-friendly approach
+    from unidecode import unidecode
+except ImportError:
+    try:
+        # Cyrillic transliteration (primarily Russian)
+        from pytils.translit import slugify
+    except ImportError:
+        # fall back to Django's default method
+        slugify = django_slugify
+else:
+    # Use Django's default method over decoded string
+    def slugify(value):
+        return django_slugify(unidecode(value))
 
 
 def get_prepopulated_value(field, instance):
@@ -28,9 +54,9 @@ def get_prepopulated_value(field, instance):
             values.append(value)
 
         return values
-    
 
-def generate_unique_slug(field, instance, slugs):
+
+def generate_unique_slug(field, instance, slugs, manager):
     """
     Pick the first unique slug from given list. If none is unique generates one 
     by adding a number to first given value until no model instance can be found 
@@ -44,6 +70,9 @@ def generate_unique_slug(field, instance, slugs):
 
     index = 1
 
+    if not manager:
+        manager = type(instance).objects
+
     for add_index in [False, True]: 
         for slug in slugs: 
             original_slug = slug = crop_slug(field, slug)
@@ -51,7 +80,7 @@ def generate_unique_slug(field, instance, slugs):
             while True:
                 # find instances with same slug
                 lookups = dict(default_lookups, **{field.name: slug})
-                rivals = type(instance).objects.filter(**lookups).exclude(pk=instance.pk)
+                rivals = manager.filter(**lookups).exclude(pk=instance.pk)
 
                 if not rivals:
                     # the slug is unique, no model uses it
@@ -79,6 +108,7 @@ def generate_unique_slug(field, instance, slugs):
                     # ...next iteration...
                 else: 
                     break 
+
 
 def get_uniqueness_lookups(field, instance, unique_with):
     """
@@ -146,7 +176,40 @@ def get_uniqueness_lookups(field, instance, unique_with):
             else:
                 yield field_name, value
 
+
 def crop_slug(field, slug):
     if field.max_length < len(slug):
         return slug[:field.max_length]
     return slug
+
+
+try:
+    import translitcodec
+except ImportError:
+    pass
+else:
+    import re
+    PUNCT_RE = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
+
+    def translitcodec_slugify(codec):
+        def _slugify(value, delim=u'-', encoding=''):
+            """
+            Generates an ASCII-only slug.
+
+            Borrowed from http://flask.pocoo.org/snippets/5/
+            """
+            if encoding:
+                encoder = "%s/%s" % (codec, encoding)
+            else:
+                encoder = codec
+            result = []
+            for word in PUNCT_RE.split(value.lower()):
+                word = word.encode(encoder)
+                if word:
+                    result.append(word)
+            return unicode(delim.join(result))
+        return _slugify
+
+    translit_long = translitcodec_slugify("translit/long")
+    translit_short = translitcodec_slugify("translit/short")
+    translit_one = translitcodec_slugify("translit/one")
